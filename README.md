@@ -47,8 +47,13 @@ ehr_project/
 │   │   ├── profiles/            # PatientProfile classes
 │   │   ├── data_processing/     # Extraction & cleaning functions
 │   │   └── helpers.py
-│   ├── data/                    # Raw data (download required)
-│   └── cleaned_data/            # Output from Part 2
+│   ├── data/                    # Data folder
+│        ├── week_1/             # Data for week_1
+│        │    ├──raw/
+│        │    ├──cleaned_data/
+│        │    └──processed_data/ 
+│        └── other weeks...
+│ 
 ├── week_2/                      # Feature Engineering & Classification
 ├── week_3/                      # Model Development & Evaluation
 ├── week_4/                      # Agentic System & Monitoring
