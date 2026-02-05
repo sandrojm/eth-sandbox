@@ -12,7 +12,8 @@ VITAL_PATTERNS = {
     'weight_lb': r'(?:Weight|Wt)[:\s]*(\d+\.?\d*)\s*(?:lb|lbs|LB)',
     'height_cm': r'(?:Height|Ht)[:\s]*(\d+\.?\d*)\s*(?:cm|CM)',
     'spo2': r'(?:SpO2|O2 Sat|Oxygen)[:\s]*(\d{2,3})\s*%',
-    'temp': None  # TODO: Add temperature pattern
+    'temp_c': r'(?:Temp|Temperature)[:\s]*(\d+\.?\d*)\s*(?:C|c)',
+    'temp_f': r'(?:Temp|Temperature)[:\s]*(\d+\.?\d*)\s*(?:F|f)'
 }
 
 VITAL_LOINC_CODES = {
@@ -31,7 +32,7 @@ LAB_PATTERNS = {
     'hba1c': r'(?:HbA1c|A1c|Hemoglobin A1c)[:\s]*(\d+\.?\d*)\s*%?',
     'glucose': r'(?:Glucose|Blood Sugar|BG)[:\s]*(\d+)\s*(?:mg/dL)?',
     'creatinine': r'(?:Creatinine|Cr)[:\s]*(\d+\.?\d*)\s*(?:mg/dL)?',
-    'egfr': None  # TODO: Add eGFR pattern
+    'egfr': r'(?:eGFR|GFR)[:\s]*(\d+\.?\d*)\s*(?:mL/min)?'
 }
 
 LAB_LOINC_CODES = {
@@ -94,8 +95,91 @@ def extract_vitals_from_note(note_text, patient_id, encounter_id):
     if not isinstance(note_text, str):
         return vitals
 
-    # TODO: Implement extraction for BP, Weight, SpO2, Temperature
-    # Use VITAL_PATTERNS and VITAL_LOINC_CODES
+    # --- Blood Pressure ---
+    # Blood pressure extraction creates TWO records: systolic and diastolic
+    # TODO: Search for BP pattern using re.search() with VITAL_PATTERNS['bp']
+    bp_match = re.search(VITAL_PATTERNS['bp'], note_text, re.IGNORECASE)
+
+    if bp_match:
+        # Systolic Blood Pressure (first captured group)
+        vitals.append({
+            'PATIENT': patient_id,
+            'ENCOUNTER': encounter_id,
+            'CODE': VITAL_LOINC_CODES['Systolic Blood Pressure'],
+            'DESCRIPTION': 'Systolic Blood Pressure',
+            'VALUE': int(bp_match.group(1)),
+            'UNITS': 'mmHg'
+        })
+
+        # Diastolic Blood Pressure (second captured group)
+        # TODO: Create dict for diastolic
+        vitals.append({
+            'PATIENT': patient_id,
+            'ENCOUNTER': encounter_id,
+            'CODE': VITAL_LOINC_CODES['Diastolic Blood Pressure'],
+            'DESCRIPTION': 'Diastolic Blood Pressure',
+            'VALUE': int(bp_match.group(2)),
+            'UNITS': 'mmHg'
+        })
+
+    # --- Weight ---
+    # Check for kg first, then lbs (convert lbs to kg)
+    weight_kg = re.search(VITAL_PATTERNS['weight_kg'], note_text, re.IGNORECASE)
+    weight_lb = re.search(VITAL_PATTERNS['weight_lb'], note_text, re.IGNORECASE)
+
+    if weight_kg:
+        vitals.append({
+            'PATIENT': patient_id,
+            'ENCOUNTER': encounter_id,
+            'CODE': VITAL_LOINC_CODES['Body Weight'],
+            'DESCRIPTION': 'Body Weight',
+            'VALUE': float(weight_kg.group(1)),
+            'UNITS': 'kg'
+        })
+    elif weight_lb:
+        vitals.append({
+            'PATIENT': patient_id,
+            'ENCOUNTER': encounter_id,
+            'CODE': VITAL_LOINC_CODES['Body Weight'],
+            'DESCRIPTION': 'Body Weight',
+            'VALUE': round(float(weight_lb.group(1)) * 0.453592,2),
+            'UNITS': 'kg'
+        })
+
+    # --- SpO2 ---
+    spo2_match = re.search(VITAL_PATTERNS['spo2'], note_text, re.IGNORECASE)
+    if spo2_match:
+        vitals.append({
+            'PATIENT': patient_id,
+            'ENCOUNTER': encounter_id,
+            'CODE': VITAL_LOINC_CODES['Oxygen saturation'],
+            'DESCRIPTION': 'Oxygen saturation',
+            'VALUE': int(spo2_match.group(1)),
+            'UNITS': '%'
+        })
+
+    # --- Temperature ---
+    temp_c = re.search(VITAL_PATTERNS['temp_c'], note_text, re.IGNORECASE)
+    temp_f = re.search(VITAL_PATTERNS['temp_f'], note_text, re.IGNORECASE)
+    
+    if temp_c:
+        vitals.append({
+            'PATIENT': patient_id,
+            'ENCOUNTER': encounter_id,
+            'CODE': VITAL_LOINC_CODES['Body Temperature'],
+            'DESCRIPTION': 'Body Temperature',
+            'VALUE': float(temp_c.group(1)),
+            'UNITS': 'C'
+        })
+    elif temp_f:
+        vitals.append({
+            'PATIENT': patient_id,
+            'ENCOUNTER': encounter_id,
+            'CODE': VITAL_LOINC_CODES['Body Temperature'],
+            'DESCRIPTION': 'Body Temperature',
+            'VALUE': round((float(temp_f.group(1)) - 32) * 5 / 9,2),
+            'UNITS': 'C'
+        })
 
     return vitals
 
@@ -118,8 +202,30 @@ def extract_labs_from_note(note_text, patient_id, encounter_id):
     if not isinstance(note_text, str):
         return labs
 
-    # TODO: Implement extraction for HbA1c, Glucose, Creatinine, eGFR
-    # Use LAB_PATTERNS, LAB_LOINC_CODES, and LAB_RANGES for validation
+    for lab_name, pattern in LAB_PATTERNS.items():
+        # Skip if pattern is None (not yet implemented)
+        if pattern is None:
+            continue
+
+        match = re.search(pattern, note_text, re.IGNORECASE)
+
+        if match:
+            value = float(match.group(1))
+
+            min_val, max_val = LAB_RANGES[lab_name]
+
+            # Only accept values within valid range
+            if value is not None and min_val <= value <= max_val:
+                code, description, units = LAB_LOINC_CODES[lab_name]
+                labs.append({
+                    'PATIENT': patient_id,
+                    'ENCOUNTER': encounter_id,
+                    'CODE': code,
+                    'DESCRIPTION': description,
+                    'VALUE': value,
+                    'UNITS': units
+                })
+
 
     return labs
 
@@ -141,8 +247,23 @@ def extract_medications_from_note(note_text, patient_id, encounter_id):
     if not isinstance(note_text, str):
         return medications
 
-    # TODO: Implement dictionary-based medication matching
-    # Use KNOWN_MEDICATIONS dict
+    note_lower = note_text.lower()
+
+    # Track which medications we've found (avoid duplicates)
+    found_meds = set()
+
+    for keyword, description in KNOWN_MEDICATIONS.items():
+        if description in found_meds:
+          continue
+  
+        if keyword in note_lower:
+            found_meds.add(description)
+            medications.append({
+                'PATIENT': patient_id,
+                'ENCOUNTER': encounter_id,
+                'DESCRIPTION': description,
+                'REASONDESCRIPTION': None
+            })
 
     return medications
 
@@ -170,9 +291,8 @@ def extract_all_from_note(note_text, patient_id='', encounter_id=''):
     if not isinstance(note_text, str):
         return {'vitals': [], 'labs': [], 'medications': []}
 
-    # TODO: Call extraction functions and return combined results
     return {
-        'vitals': None,
-        'labs': None,
-        'medications': None
+        'vitals': extract_vitals_from_note(note_text, patient_id, encounter_id),
+        'labs': extract_labs_from_note(note_text, patient_id, encounter_id),
+        'medications': extract_medications_from_note(note_text, patient_id, encounter_id)
     }
