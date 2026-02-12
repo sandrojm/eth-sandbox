@@ -180,8 +180,8 @@ class PatientProfile:
             except (ValueError, TypeError):
                 pass
 
-    def add_encounter(self, encounter_data: Dict) -> None:
-        """Add a medical encounter to the profile."""
+    def add_encounter_record(self, encounter_data: Dict) -> None:
+        """Add a medical encounter to the profile from raw data dict."""
         self.encounters.append(encounter_data)
 
     def add_procedure(self, procedure_data: Dict) -> None:
@@ -290,19 +290,6 @@ class PatientProfile:
         profile.social_history = data.get('social_history', {})
         profile.diabetes_profile = data.get('diabetes_profile', {})
         return profile
-
-    def summary(self) -> None:
-        """Print a summary of the patient profile."""
-        print(f"Patient ID: {self.patient_id}")
-        print(f"Demographics: {self.demographics.get('gender')}, born {self.demographics.get('birthdate')}")
-        print(f"Encounters: {len(self.encounters)}, Conditions: {len(self.conditions)}")
-        print(f"Medications: {len(self.medications)}, Observations: {len(self.observations)}")
-        print(f"Procedures: {len(self.procedures)}, Allergies: {len(self.allergies)}")
-        if self.diabetes_profile['has_diabetes']:
-            print(f"Diabetes: {self.diabetes_profile['diabetes_type']}")
-            if self.diabetes_profile['latest_hba1c']:
-                hba1c = self.diabetes_profile['latest_hba1c']
-                print(f"Latest HbA1c: {hba1c['value']}% on {hba1c['date']}")
 
     def __repr__(self) -> str:
         return f"PatientProfile(id={self.patient_id}, conditions={len(self.conditions)}, encounters={len(self.encounters)})"
