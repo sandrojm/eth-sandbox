@@ -304,7 +304,8 @@ class ExtendedPatientProfile(PatientProfile):
         --------
         int : Days since last encounter, or None if no encounters found
         """
-        return self._days_since_last_event(target_date, self.encounter_timeline)
+        # TODO: Implement this method
+        return None
 
     def _days_since_medication_change(self, target_date: datetime) -> Optional[int]:
         """
@@ -389,16 +390,16 @@ class ExtendedPatientProfile(PatientProfile):
 
     def _get_active_medication_count(self, target_date: datetime) -> int:
         """
-        Get count of medications active at target_date.
+        Count medications active at target_date.
 
         HOMEWORK TODO: Implement this method.
 
-        A medication is active if its most recent event before target_date
-        is 'started' (not 'stopped'). For each unique medication name,
-        find its latest action and count those that are not 'stopped'.
+        A medication is active if: started before target_date AND
+        (not stopped OR stopped after target_date).
 
-        Hint: Use self.medication_timeline. Group by medication name,
-        find latest action for each, count non-stopped ones.
+        Hint: Use self.medication_timeline. Each entry has 'action' ('started'
+        or 'stopped'), 'medication' (name), and 'date'. Group by medication name,
+        check if its start is before target_date and its stop (if any) is after.
 
         Returns:
         --------
@@ -407,21 +408,22 @@ class ExtendedPatientProfile(PatientProfile):
         # TODO: Implement this method
         return 0
 
-    def _get_longest_care_gap(self, target_date: datetime) -> int:
+    def _get_longest_care_gap(self, target_date: datetime) -> Optional[int]:
         """
-        Get longest care gap (days) before target_date.
+        Get longest gap (days) between consecutive HbA1c tests before target_date.
 
         HOMEWORK TODO: Implement this method.
 
-        Hint: Use self.care_gap_timeline and filter to gaps before target_date.
-        Return the maximum 'days_overdue' value, or 0 if no gaps found.
+        Hint: Use self.hba1c_timeline. Filter to readings before target_date,
+        sort by date, compute gaps between consecutive readings, return the max.
+        Return None if fewer than 2 readings.
 
         Returns:
         --------
-        int : Longest care gap in days, or 0 if no care gaps
+        int : Longest gap in days, or None if < 2 HbA1c readings
         """
         # TODO: Implement this method
-        return 0
+        return None
 
     # ──────────────────────────────────────────────────────────────
     # Feature Extraction Methods
@@ -490,9 +492,7 @@ class ExtendedPatientProfile(PatientProfile):
             if safe_parse_date(g['date']) and safe_parse_date(g['date']) <= target_date
         ]
         features['care_gaps_count'] = len(care_gaps_before)
-        features['longest_care_gap_days'] = max(
-            [g.get('days_overdue', 0) for g in care_gaps_before], default=0
-        )
+        features['longest_care_gap_days'] = self._get_longest_care_gap(target_date)
 
         # Blood pressure features (Session 1 feature)
         features['current_systolic_bp'] = self._current_systolic_bp(target_date)
@@ -558,14 +558,14 @@ class ExtendedPatientProfile(PatientProfile):
             return 0
 
         readings_in_window.sort(key=lambda x: safe_parse_date(x['date']))
-        first_bp = readings_in_window[0].get('systolic', 0)
-        last_bp = readings_in_window[-1].get('systolic', 0)
+        first_bp = readings_in_window[0].get('systolic')
+        last_bp = readings_in_window[-1].get('systolic')
 
-        if first_bp and last_bp:
+        if first_bp is not None and last_bp is not None:
             diff = last_bp - first_bp
-            if diff > 10:
+            if diff >= 10:
                 return 1  # Worsening (BP increasing)
-            elif diff < -10:
+            elif diff <= -10:
                 return -1  # Improving (BP decreasing)
         return 0  # Stable
 
@@ -583,14 +583,14 @@ class ExtendedPatientProfile(PatientProfile):
             return 0
 
         readings_in_window.sort(key=lambda x: safe_parse_date(x['date']))
-        first_egfr = readings_in_window[0].get('value', 0)
-        last_egfr = readings_in_window[-1].get('value', 0)
+        first_egfr = readings_in_window[0].get('value')
+        last_egfr = readings_in_window[-1].get('value')
 
-        if first_egfr and last_egfr:
+        if first_egfr is not None and last_egfr is not None:
             diff = last_egfr - first_egfr
-            if diff < -10:
+            if diff <= -5:
                 return -1  # Worsening (eGFR decreasing = kidney function declining)
-            elif diff > 10:
+            elif diff >= 5:
                 return 1  # Improving (eGFR increasing)
         return 0  # Stable
 
