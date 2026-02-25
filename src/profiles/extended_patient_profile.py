@@ -258,6 +258,36 @@ class ExtendedPatientProfile(PatientProfile):
 
         last_reading = max(readings_before, key=lambda x: safe_parse_date(x['date']))
         return last_reading.get('value')
+    
+    def _get_events_in_window(self, target_date: datetime, timeline: Optional[List[Dict]],
+                           window_days: int) -> List[Dict]:
+        """Return events of a timeline within a window"""
+        window_start = target_date - timedelta(days=window_days)
+
+        if len(timeline) == 0:
+            return None
+        
+        event_list = []
+        for event in timeline:
+            event_date = safe_parse_date(event['date'])
+            if event_date and window_start <= event_date <= target_date:
+                event_list.append(event)
+        
+        return event_list
+
+    def _get_events_before_target(self, target_date: datetime, timeline: List[Dict]) -> Optional[List[Dict]]:
+
+        if len(timeline) == 0:
+            return None
+        
+        return [
+            e for e in timeline
+            if safe_parse_date(e['date']) and safe_parse_date(e['date']) <= target_date
+        ]
+
+
+        
+
 
     # ──────────────────────────────────────────────────────────────
     # SESSION 1: Feature methods (6 provided implementations)
@@ -295,135 +325,140 @@ class ExtendedPatientProfile(PatientProfile):
         """
         Calculate days since last encounter before target_date.
 
-        HOMEWORK TODO: Implement this method.
-
-        Hint: Use self.encounter_timeline and filter to events before target_date.
-        You can use the _days_since_last_event helper method, or implement directly.
-
         Returns:
         --------
         int : Days since last encounter, or None if no encounters found
         """
-        # TODO: Implement this method
-        return None
+        return self._days_since_last_event(target_date, self.encounter_timeline)
 
     def _days_since_medication_change(self, target_date: datetime) -> Optional[int]:
         """
         Calculate days since last medication change before target_date.
 
-        HOMEWORK TODO: Implement this method.
-
-        Hint: Use self.medication_timeline and filter to events before target_date.
-        You can use the _days_since_last_event helper method, or implement directly.
-
         Returns:
         --------
         int : Days since last medication change, or None if no changes found
         """
-        # TODO: Implement this method
-        return None
+        return self._days_since_last_event(target_date, self.medication_timeline)
 
     def _emergency_visits_last_180d(self, target_date: datetime) -> int:
         """
         Count emergency visits in the 180 days before target_date.
 
-        HOMEWORK TODO: Implement this method.
-
-        Hint: Use self.emergency_visit_timeline and count events within the window.
-        You can use the _count_events_in_window helper method, or implement directly.
-
         Returns:
         --------
         int : Number of emergency visits in the last 180 days
         """
-        # TODO: Implement this method
-        return 0
+        return self._count_events_in_window(target_date, self.emergency_visit_timeline, 180)
 
     def _medication_changes_last_90d(self, target_date: datetime) -> int:
         """
         Count medication changes in the 90 days before target_date.
 
-        HOMEWORK TODO: Implement this method.
-
-        Hint: Use self.medication_timeline and count events within the window.
-        You can use the _count_events_in_window helper method, or implement directly.
-
         Returns:
         --------
         int : Number of medication changes in the last 90 days
         """
-        # TODO: Implement this method
-        return 0
+        return self._count_events_in_window(target_date, self.medication_timeline, 90)
 
     def _calculate_hba1c_trend(self, target_date: datetime, window_days: int = 180) -> float:
         """
         Calculate HbA1c trend (slope) over window_days before target_date.
 
-        HOMEWORK TODO: Implement this method.
-
-        Hint: Get readings in the window, compare first and last values.
-        A change > 0.5 is worsening, < -0.5 is improving, else stable.
-
         Returns:
         --------
         float : Trend direction (-1=improving, 0=stable, 1=worsening)
         """
-        # TODO: Implement this method
-        return 0
+        hba1c_in_window = self._get_events_in_window(target_date, self.hba1c_timeline, 180)
+
+        if hba1c_in_window is None or len(hba1c_in_window) < 2:
+            return 0
+
+        first_value = float(hba1c_in_window[0]['value'])
+        last_value = float(hba1c_in_window[-1]['value'])
+        change = last_value - first_value
+
+        if change >= 0.5:
+            return 1  # Worsening
+        elif change <= -0.5:
+            return -1  # Improving
+        else:
+            return 0  # Stable
 
     def _get_bmi_category(self, target_date: datetime) -> Optional[int]:
         """
         Get BMI category from most recent BMI reading before target_date.
 
-        HOMEWORK TODO: Implement this method.
-
-        Hint: Use self.bmi_timeline to find the most recent BMI reading.
-        Then classify it: <18.5=1 (underweight), 18.5-24.9=2 (normal),
-        25-29.9=3 (overweight), >=30=4 (obese).
-
         Returns:
         --------
         int : BMI category (1-4), or None if no BMI data found
         """
-        # TODO: Implement this method
-        return None
 
+        readings_before_cutoff = self._get_events_before_target(target_date, self.bmi_timeline)
+        
+        if readings_before_cutoff is None or len(readings_before_cutoff) == 0:
+            return None
+        
+        last_bmi = readings_before_cutoff[-1]['value']
+
+        if last_bmi < 18.5:
+            return 1 # underweight
+        elif 18.5 <= last_bmi < 25:
+            return 2 # normal
+        elif 25 <= last_bmi < 30:
+            return 3 # overweight
+        else:
+            return 4 # obese
+        
     def _get_active_medication_count(self, target_date: datetime) -> int:
         """
         Count medications active at target_date.
-
-        HOMEWORK TODO: Implement this method.
-
-        A medication is active if: started before target_date AND
-        (not stopped OR stopped after target_date).
-
-        Hint: Use self.medication_timeline. Each entry has 'action' ('started'
-        or 'stopped'), 'medication' (name), and 'date'. Group by medication name,
-        check if its start is before target_date and its stop (if any) is after.
 
         Returns:
         --------
         int : Number of active medications
         """
-        # TODO: Implement this method
-        return 0
+
+        medications_before_cutoff = self._get_events_before_target(target_date, self.medication_timeline)
+        
+        if medications_before_cutoff is None or len(medications_before_cutoff) == 0:
+            return 0
+        
+        active_medications_count = 0
+
+        for row in medications_before_cutoff:
+            if row['action'] == 'started':
+                medication_stopped_count = sum(
+                    1 for e in medications_before_cutoff
+                    if (e['medication'] == row['medication'] and
+                        e['action'] == 'stopped' and
+                        safe_parse_date(e['date']) > safe_parse_date(row['date']))
+                )
+                
+                if medication_stopped_count == 0:
+                    active_medications_count += 1
+        
+        return active_medications_count
 
     def _get_longest_care_gap(self, target_date: datetime) -> Optional[int]:
         """
         Get longest gap (days) between consecutive HbA1c tests before target_date.
 
-        HOMEWORK TODO: Implement this method.
-
-        Hint: Use self.hba1c_timeline. Filter to readings before target_date,
-        sort by date, compute gaps between consecutive readings, return the max.
-        Return None if fewer than 2 readings.
-
         Returns:
         --------
         int : Longest gap in days, or None if < 2 HbA1c readings
         """
-        # TODO: Implement this method
-        return None
+
+        hba1c_before_cutoff = self._get_events_before_target(target_date, self.hba1c_timeline)
+
+        if hba1c_before_cutoff is None or len(hba1c_before_cutoff) < 2:
+            return None
+        
+        dates = [safe_parse_date(e['date']) for e in hba1c_before_cutoff]
+
+        gaps = [(dates[i+1] - dates[i]).days for i in range(len(dates)-1)]
+
+        return max(gaps)
 
     # ──────────────────────────────────────────────────────────────
     # Feature Extraction Methods
