@@ -7,7 +7,7 @@ name = "src"
 version = "0.1.0"
 
 [tool.setuptools]
-py-modules = ["helpers"]
+py-modules = ["helpers", "ehr_pipeline"]
 
 [tool.setuptools.packages.find]
 where = ["."]

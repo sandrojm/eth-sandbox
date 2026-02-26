@@ -131,13 +131,16 @@ class ExtendedPatientProfile(PatientProfile):
         self.hospitalization_timeline.sort(key=lambda x: safe_parse_date(x['date']) or datetime.min)
 
     def add_encounter(self, date: str, encounter_type: str, reason: str = "") -> None:
-        """Add general encounter to timeline."""
-        self.encounter_timeline.append({
+        """Add general encounter to timeline and base encounter list."""
+        encounter_dict = {
             "date": date,
             "encounter_type": encounter_type,
             "reason": reason
-        })
+        }
+        self.encounter_timeline.append(encounter_dict)
         self.encounter_timeline.sort(key=lambda x: safe_parse_date(x['date']) or datetime.min)
+        # Also populate parent's encounters list for summary() compatibility
+        self.encounters.append(encounter_dict)
 
     def add_encounter_event(self, date: str, encounter_type: str, reason: str = "") -> None:
         """Alias for add_encounter."""
@@ -286,6 +289,16 @@ class ExtendedPatientProfile(PatientProfile):
         extended.diabetes_profile = profile.diabetes_profile
 
         return extended
+
+    def summary(self) -> None:
+        """Print a summary of the extended patient profile including timeline data."""
+        super().summary()
+        print(f"--- Timelines ---")
+        print(f"HbA1c readings: {len(self.hba1c_timeline)}, BP readings: {len(self.bp_timeline)}")
+        print(f"Medication events: {len(self.medication_timeline)}, eGFR readings: {len(self.egfr_timeline)}")
+        print(f"Emergency visits: {len(self.emergency_visit_timeline)}, Hospitalizations: {len(self.hospitalization_timeline)}")
+        print(f"Complications: {len(self.complication_timeline)}, Care gaps: {len(self.care_gap_timeline)}")
+        print(f"BMI readings: {len(self.bmi_timeline)}, Risk events: {len(self.risk_events)}")
 
     def __repr__(self) -> str:
         return (f"ExtendedPatientProfile(id={self.patient_id}, "
