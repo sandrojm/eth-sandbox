@@ -153,7 +153,28 @@ def get_max_hba1c(profile, cutoff_time):
 
 ### Prerequisites
 
-All required libraries (pandas, numpy, scikit-learn, matplotlib, seaborn) are pre-installed on Google Colab.
+All required libraries are pre-installed on Google Colab.
+
+### Local Setup
+
+1. Install Python dependencies:
+   ```bash
+   pip install -r requirements.txt
+   ```
+
+2. Download the required NLP models:
+   ```bash
+   # Standard spaCy English model
+   python -m spacy download en_core_web_sm
+
+   # scispaCy biomedical NER model (diseases & chemicals)
+   pip install https://s3-us-west-2.amazonaws.com/ai2-s2-scispacy/releases/v0.5.4/en_ner_bc5cdr_md-0.5.4.tar.gz
+   ```
+
+3. Install the local source package (so notebooks can import from `src/`):
+   ```bash
+   pip install -e src/
+   ```
 
 ### Running on Google Colab
 1. Mount Google Drive
