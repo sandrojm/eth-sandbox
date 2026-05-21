@@ -14,10 +14,8 @@ def load_ocr_config(config_path):
 
 def has_letter_and_digit(word):
     """Check if word contains both letters and digits."""
-    # TODO: Check if word has at least one letter
-    has_letter = None  # Use any() with c.isalpha()
-    # TODO: Check if word has at least one digit
-    has_digit = None  # Use any() with c.isdigit()
+    has_letter = any(c.isalpha() for c in word)
+    has_digit = any(c.isdigit() for c in word)
     return has_letter and has_digit
 
 
@@ -28,8 +26,8 @@ def fix_ocr_word(word, ocr_subs, valid_terms):
     if word.lower() in valid_terms:
         return word
     fixed = word.lower()
-    for wrong, right in ocr_subs.items():
-        fixed = fixed.replace(wrong, right)
+    for digit, letter in ocr_subs.items():
+        fixed = fixed.replace(digit, letter)
     return fixed
 
 
@@ -64,7 +62,7 @@ def strip_html(text):
     """Remove HTML tags from text."""
     if pd.isna(text):
         return text
-    return re.sub(r'<[^>]+>', '', text)
+    return re.sub(r'<[^>]+>', '', str(text))
 
 
 def has_html_tags(text):

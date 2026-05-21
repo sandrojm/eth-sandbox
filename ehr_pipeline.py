@@ -30,9 +30,9 @@ import pandas as pd
 # Imports resolve via pip install (data_processing/, profiles/ are siblings)
 # ---------------------------------------------------------------------------
 
-from data_processing.ocr import strip_html, fix_ocr_text, has_ocr_errors
-from data_processing.extraction import extract_all_from_note
-from profiles.extended_patient_profile import (
+from src.data_processing.ocr import strip_html, fix_ocr_text, has_ocr_errors
+from src.data_processing.extraction import extract_all_from_note
+from src.profiles.extended_patient_profile import (
     ExtendedPatientProfile,
     safe_parse_date,
 )
