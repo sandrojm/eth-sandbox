@@ -4,6 +4,7 @@ import plotly.express as px
 import plotly.graph_objects as go
 from datetime import datetime, timedelta
 import numpy as np
+from pathlib import Path
 
 # ============================================================================
 # STREAMLIT APP: EHR Risk Prediction Pipeline Explorer
@@ -26,9 +27,13 @@ def load_pipeline():
     """Load and cache the pipeline"""
     from ehr_pipeline import EHRPipeline
 
+    BASE_DIR = Path(__file__).resolve().parent
+
+    REPO_DIR = Path("G:/My Drive/MASAID/AI_Project_Group/repo")
+
     pipe = EHRPipeline(
-        data_dir='./data/week_3/new_data/csv',
-        model_path='./data/week_3/best_xgboost_model.pkl'
+        data_dir=REPO_DIR / "data" / "week_3" / "new_data" / "csv",
+        model_path=REPO_DIR / "data" / "week_3" / "best_xgboost_model.pkl"
     )
     pipe.load_csvs().clean_notes().extract_notes().build_profiles()
     return pipe

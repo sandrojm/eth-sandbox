@@ -1,4 +1,4 @@
 # EHR Project Configuration
 # Update repo_path to your Google Drive folder before running notebooks
 
-repo_path: "/content/drive/MyDrive/PATH_TO_YOUR_REPO"
+repo_path: "G:/My Drive/MASAID/AI_Project_Group/repo"
