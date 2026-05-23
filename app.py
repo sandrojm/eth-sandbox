@@ -47,12 +47,14 @@ st.sidebar.success(f"✅ Loaded {len(pipe.profiles):,} patient profiles")
 # TAB 1: Pipeline Overview
 # ============================================================================
 
-tab1, tab2, tab3, tab4, tab5 = st.tabs([
+tab1, tab2, tab3, tab4, tab5, tab6, tab7 = st.tabs([
     "📊 Pipeline Overview",
-    "👤 Patient Explorer", 
+    "👤 Patient Explorer",
     "🔍 Model Predictions",
     "📈 Model Performance",
-    "🧠 Feature Importance"
+    "🧠 Feature Importance",
+    "📄 Course Rubric",
+    "🎞️ Slide Deck"
 ])
 
 with tab1:
@@ -435,6 +437,23 @@ with tab5:
             
             # Display table
             st.dataframe(importance_df, use_container_width=True)
+
+# ============================================================================
+# TAB 6: Course Rubric PDF
+# ============================================================================
+
+with tab6:
+    st.header("📄 AI Project Course — Grading Rubric")
+    from streamlit_pdf_viewer import pdf_viewer
+    pdf_viewer(str(Path(__file__).resolve().parent / "AI Project Course - Grading Rubric.pdf"))
+
+with tab7:
+    st.header("🎞️ Project Slide Deck")
+    st.components.v1.iframe(
+        "https://docs.google.com/presentation/d/e/2PACX-1vTDU-qlLMCRi6n7AFxwuPKPquaKPmDYnfpf7Mnj6XuaNrq6JyrabAMCN6yJqIYyqsyTxdPOEYUwCUM5/pubembed?start=true&loop=false&delayms=3000",
+        height=600,
+        scrolling=False,
+    )
 
 # ============================================================================
 # Footer
