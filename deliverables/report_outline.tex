@@ -1,0 +1,502 @@
+\documentclass[11pt,a4paper]{article}
+\usepackage[T1]{fontenc}
+\usepackage[utf8]{inputenc}
+\usepackage[a4paper,margin=2.5cm]{geometry}
+\usepackage{xcolor}
+\usepackage{hyperref}
+\usepackage{enumitem}
+\usepackage{booktabs}
+\usepackage{titlesec}
+\usepackage{mdframed}
+\usepackage{parskip}
+\usepackage{fancyhdr}
+\definecolor{navyblue}{RGB}{31,56,100}
+\definecolor{medblue}{RGB}{46,117,182}
+\definecolor{lightblue}{RGB}{68,114,196}
+\hypersetup{colorlinks=true,linkcolor=medblue,urlcolor=medblue}
+\titleformat{\section}{\large\bfseries\color{navyblue}}{}{0em}{\thesection\quad}
+\titleformat{\subsection}{\normalsize\bfseries\color{medblue}}{}{0em}{\thesubsection\quad}
+\titleformat{\subsubsection}{\normalsize\bfseries\color{lightblue}}{}{0em}{\thesubsubsection\quad}
+\pagestyle{fancy}
+\fancyhf{}
+\lhead{\color{navyblue}\small\leftmark}
+\rfoot{\small\thepage}
+\mdfdefinestyle{warnbox}{backgroundcolor=yellow!15,linecolor=orange,linewidth=1pt,
+  innertopmargin=6pt,innerbottommargin=6pt,innerleftmargin=8pt,innerrightmargin=8pt}
+\mdfdefinestyle{recbox}{linecolor=medblue,linewidth=3pt,topline=false,bottomline=false,rightline=false,
+  innerleftmargin=10pt,innerrightmargin=8pt,innertopmargin=4pt,innerbottommargin=4pt}
+
+\begin{document}
+\begin{titlepage}
+\centering\vspace*{3cm}
+{\Huge\bfseries\color{navyblue} Project Report Outline\\[0.5em]}
+{\large\color{medblue} Patient Monitoring via Structured Electronic Health Records\\[2em]}
+{\normalsize SwissCare Health Network AG --- AI Project Course}\\[0.5em]
+{\small\today}
+\end{titlepage}
+\tableofcontents\newpage
+\section{Project Report Outline}
+\subsection{Patient Monitoring via Structured Electronic Health Records}
+\subsubsection{SwissCare Health Network AG --- AI Project Course}
+
+\noindent\rule{\linewidth}{0.4pt}
+
+\section{Executive Summary}
+
+SwissCare Health Network AG processes over 3 million patient encounters annually, yet 70\% of clinical information is locked in unstructured notes --- creating information gaps that drive preventable hospital readmissions and expose the organisation to regulatory risk under the EU AI Act and GDPR. This project delivers an end-to-end ML pipeline that transforms raw EHR data into standardised patient profiles and predicts 30-day high-risk adverse events in diabetic patients, targeting a 48--72 hour intervention window where clinical action has the highest impact. The pipeline comprises four stages: clinical note cleaning and structured extraction, FHIR-inspired patient profile construction with 22 temporally-safe features, an XGBoost risk classifier selected for its superior PR-AUC over five baselines (including a single-feature HbA1c rule at PR-AUC \textasciitilde{}0.155), and an autonomous monitoring system with configurable alert thresholds and a SHAP-based explanation layer that surfaces the top risk factors per patient in plain clinical language. The final model achieves [ROC-AUC] / [PR-AUC] on a patient-held-out test set and was validated for demographic fairness, calibration, and temporal generalisation. An explored 25-feature variant incorporating ZIP-code census data (population density, provider density, insurance coverage) found near-zero correlations with 30-day outcomes and is not recommended for deployment. Automated scoring reduces the manual review burden to flagged high-risk alerts only, with each prevented readmission avoiding an estimated [X CHF] in acute care costs; regulatory compliance documentation produced alongside the model directly mitigates penalty exposure under EU AI Act high-risk provisions. We recommend deploying the 22-feature model, piloting alert thresholds in a single ward before hospital-wide rollout to calibrate the precision-recall balance acceptable to nursing staff, and treating human oversight mechanisms and audit logging as first-class engineering requirements from the outset of any similar initiative.
+
+\noindent\rule{\linewidth}{0.4pt}
+
+\section{1. Introduction \& System Overview}
+
+\subsection{1.1 Business Context and Problem Statement}
+\begin{itemize}
+\item SwissCare Health Network manages hospitals and clinics across Switzerland and the EU, processing over 3 million patient encounters annually
+\item 70\% of clinical information lives in unstructured notes, making it inaccessible for systematic analysis or real-time risk scoring
+\item Hospital readmissions result from information gaps between providers; manual review at the scale needed is not feasible with current staffing
+\item Regulatory landscape (EU AI Act, GDPR/revFADP, Swiss healthcare law) requires AI systems used in clinical decision support to be transparent, auditable, and human-supervised
+\item The compounding effect: fragmented data $\rightarrow$ missed early warning signals $\rightarrow$ adverse events $\rightarrow$ regulatory exposure
+\end{itemize}
+
+\subsection{1.2 Project Objectives}
+\begin{itemize}
+\item Automate the conversion of unstructured clinical notes and structured EHR tables into standardized patient profiles
+\item Enable proactive risk identification at least 48--72 hours before adverse events, without requiring extensive manual review
+\item Achieve full compliance with EU AI Act (high-risk classification), GDPR/revFADP Article 22 (automated decisions), HL7 FHIR (data interoperability), and SNOMED CT/ICD-10 (clinical coding)
+\end{itemize}
+
+\subsection{1.3 Scope and Dataset}
+\begin{itemize}
+\item Synthea-generated EHR dataset with 50,000+ patient records across 7 relational tables: patients, encounters, conditions, medications, observations, procedures, allergies
+\item Approximately 25\% of encounters exist only as unstructured clinical notes (free text, semi-structured reports)
+\item Focus population: diabetic patients, as identified by diagnosis codes and clinical terminology matching
+\item Prediction target: 30-day high-risk adverse event (emergency visits, hospitalizations, acute complications, HbA1c $\geq$ 10.0\%)
+\end{itemize}
+
+\subsection{1.4 Stakeholders and Success Metrics}
+\begin{itemize}
+\item Chief Medical Officer: adverse event prediction rate, false positive rate
+\item Emergency Department Director: alert recall and precision
+\item Nursing Leadership: alert interpretability, false positive alert rate (alert fatigue)
+\item Chief Information Officer: system reliability, FHIR formatting compliance
+\item Compliance Officer: zero regulatory violations, documentation completeness
+\item Patients: outcome improvement, meaningful information about automated decisions affecting their care
+\end{itemize}
+
+\noindent\rule{\linewidth}{0.4pt}
+
+\section{2. Technical Decision Justification}
+
+\subsection{2.1 Data Variables and Privacy Justification}
+\begin{itemize}
+\item Structured tables used: patient demographics (age, gender, race), encounter records (dates, types, descriptions), diagnosis conditions (ICD-10 codes), medication records (names, start/stop dates), lab observations (HbA1c, eGFR, blood pressure, glucose, creatinine)
+\item Unstructured source: clinical notes containing vitals, lab values, and medication mentions not captured in structured tables
+\item Justification for using personal health data: all fields are clinically necessary for risk prediction; no social identifiers (names, addresses, insurance numbers) are used as model features; data is pseudonymised by patient UUID; HbA1c and eGFR are direct clinical indicators of diabetic disease progression and are standard-of-care monitoring values; demographic variables (age, gender) are used for fairness assessment, not as primary predictors
+\item Variables excluded from modeling: patient name, address, exact birthdate (replaced by age), insurance fields --- excluded as they serve no clinical predictive function and carry unnecessary privacy risk
+\end{itemize}
+
+\subsection{2.2 Feature Engineering: The 22-Feature Set}
+
+\subsubsection{2.2.1 Temporal Counter Features}
+\begin{itemize}
+\item days\_since\_last\_hba1c: gaps indicate monitoring lapses and disengagement from care
+\item days\_since\_last\_encounter: care discontinuity signal
+\item days\_since\_medication\_change: recent changes may indicate treatment instability
+\item days\_since\_emergency\_visit: recent ED visits indicate acute decompensation
+\item days\_since\_hospitalization: recent admits indicate severe disease burden
+\end{itemize}
+
+\subsubsection{2.2.2 Rolling Window Features}
+\begin{itemize}
+\item encounters\_last\_90d: low values may indicate patient disengagement from care
+\item emergency\_visits\_last\_180d: frequency of acute decompensation episodes
+\item hospitalizations\_last\_365d: cumulative disease severity
+\item medication\_changes\_last\_90d: treatment regimen instability
+\end{itemize}
+
+\subsubsection{2.2.3 Clinical Value Features}
+\begin{itemize}
+\item current\_hba1c\_level: most recent HbA1c; higher values indicate poor glycemic control
+\item current\_systolic\_bp / current\_diastolic\_bp: hypertension as comorbidity risk
+\item current\_egfr: lower values indicate chronic kidney disease progression
+\item bmi\_category: obesity as a compounding risk factor (encoded as ordinal: 1=underweight, 2=normal, 3=overweight, 4=obese)
+\end{itemize}
+
+\subsubsection{2.2.4 Trend Features (6-month / 12-month windows)}
+\begin{itemize}
+\item hba1c\_trend\_last\_180d: worsening vs. improving glycemic control over time
+\item bp\_trend\_last\_180d: cardiovascular risk trajectory
+\item egfr\_trend\_last\_365d: kidney function decline rate
+\end{itemize}
+
+\subsubsection{2.2.5 Composite Risk Features}
+\begin{itemize}
+\item active\_medication\_count: treatment complexity indicator
+\item diabetes\_complication\_count: cumulative disease progression score
+\item care\_gaps\_count: pattern of disengagement from care system
+\item longest\_care\_gap\_days: historical care discontinuity, captures chronic non-adherence
+\item age\_at\_date: older patients carry elevated baseline complication risk
+\end{itemize}
+
+\subsubsection{2.2.6 Temporal Safety Design}
+\begin{itemize}
+\item All features use a cutoff\_time parameter: only data strictly before the prediction date is used
+\item This prevents data leakage --- a common and critical error in healthcare ML where future observations contaminate training
+\item Patient-level train/test splitting using GroupShuffleSplit ensures no patient appears in both train and test sets; row-level random splitting would allow correlated observations from the same patient to appear on both sides, inflating reported performance
+\end{itemize}
+
+\subsection{2.3 Evaluation Metrics Selection and Stakeholder Alignment}
+\begin{itemize}
+\item Primary metric: PR-AUC (Area Under the Precision-Recall Curve) --- chosen because the dataset has severe class imbalance (\textasciitilde{}3\% positive rate); ROC-AUC is optimistic under imbalance because it accounts for true negatives, which are abundant and easy to predict correctly
+\item Secondary metric: ROC-AUC --- reported alongside PR-AUC for comparability with published literature and benchmarks
+\item Clinical threshold metric: Precision at 80\% Recall --- directly answers the clinical question "if we catch 80\% of high-risk patients, how many false alarms do we generate per true alert?"
+\item Rationale for 80\% recall threshold: reflects ED Director and Nursing Leadership priorities; missing 20\% of high-risk patients is acceptable if it meaningfully reduces alert fatigue on nursing floors
+\item Stakeholder mapping: CMO and ED Director prioritize recall (catching events); Nursing Leadership prioritizes precision (alert quality); Compliance Officer prioritizes calibration and documentation
+\end{itemize}
+
+\subsection{2.4 Model Architecture Decisions}
+
+\subsubsection{2.4.1 Baseline Models (Week 2)}
+\begin{itemize}
+\item Random prediction: establishes absolute floor (coin flip biased to class distribution)
+\item Majority class prediction: demonstrates why accuracy is misleading under imbalance --- predicting "low risk" for every patient gives \textasciitilde{}97\% accuracy but zero clinical utility
+\item Single-feature HbA1c threshold (> 9\%): tests whether a single clinical rule matches ML; establishes clinical domain baseline; PR-AUC \textasciitilde{}0.155
+\item Risk factor counting: combines multiple binary indicators; tests whether feature combination helps without learned weights
+\item Logistic Regression with class\_weight='balanced': first learned model; upper baseline for linear approaches; interpretable coefficients
+\end{itemize}
+
+\subsubsection{2.4.2 Advanced Models (Week 3)}
+\begin{itemize}
+\item Decision Tree: provides full decision path interpretability; prone to overfitting, included for transparency comparison
+\item Random Forest: ensemble via bagging; reduces variance over single tree; robust to feature scale differences
+\item XGBoost (final model): sequential boosting; handles NaN natively (no imputation needed for missing labs); optimized with scale\_pos\_weight for class imbalance; eval\_metric='aucpr' to optimize directly for the primary metric; hyperparameter search via random search
+\item LSTM (temporal sequence model): explored as an alternative to tabular ML for capturing sequential patterns in patient timelines; LSTMs process the raw event sequence (HbA1c readings, encounters, medications over time) rather than engineered features; requires padding and masking for variable-length patient histories; evaluated against XGBoost on the same patient-level split
+\item Survival models explored: Kaplan-Meier for time-to-event visualization; Cox Proportional Hazards for feature-weighted survival analysis --- informative for understanding time-to-adverse-event distributions but not used in production pipeline due to complexity of real-time scoring
+\item Final model selection: XGBoost chosen for highest PR-AUC, native NaN handling (critical given missing lab values in real EHR data), production-grade inference speed, and compatibility with SHAP TreeExplainer; LSTM performance was competitive but required substantially more data preprocessing and lacked native explainability
+\end{itemize}
+
+\subsubsection{2.4.3 Handling Class Imbalance}
+\begin{itemize}
+\item Class imbalance: approximately 3\% of patient-day instances are positive (high-risk event within 30 days)
+\item Approaches evaluated: class\_weight='balanced' (logistic regression), scale\_pos\_weight (XGBoost), SMOTE (synthetic oversampling --- explored but found to create unrealistic synthetic patient timelines), threshold adjustment post-training
+\item Selected approach: scale\_pos\_weight in XGBoost combined with threshold tuning; avoids synthetic data artifacts while directly addressing the optimization objective
+\end{itemize}
+
+\subsection{2.5 Clinical Text Processing Architecture}
+
+\subsubsection{2.5.1 Note Cleaning Pipeline}
+\begin{itemize}
+\item HTML artifact stripping: clinical notes imported from web-based EHR systems often contain residual HTML tags (e.g., <br>, \&amp;); strip\_html() removes these before extraction
+\item OCR error correction: scanned documents introduce systematic character substitutions (e.g., 'l' $\rightarrow$ '1', 'O' $\rightarrow$ '0'); fix\_ocr\_text() applies a configurable substitution dictionary; has\_ocr\_errors() detects affected records; valid\_mixed\_terms list prevents correction of legitimate alphanumeric medical codes (e.g., "HbA1c", "T2DM")
+\end{itemize}
+
+\subsubsection{2.5.2 Regex-Based Extraction}
+\begin{itemize}
+\item Vitals extracted: systolic and diastolic blood pressure (LOINC 8480-6, 8462-4), body weight in kg/lbs, height in cm, SpO2, temperature in Celsius and Fahrenheit
+\item Labs extracted: HbA1c (LOINC 4548-4, range-validated 4.0--15.0\%), glucose (LOINC 2339-0), creatinine (LOINC 2160-0), eGFR (LOINC 33914-3)
+\item Medications extracted: 19 known diabetes and comorbidity medications (Metformin, Insulin variants, SGLT2 inhibitors, GLP-1 agonists, antihypertensives)
+\item Range validation: extracted numeric values are checked against clinical reference ranges; out-of-range values are discarded as extraction errors rather than propagated as data quality issues
+\end{itemize}
+
+\subsubsection{2.5.3 NER with spaCy and scispaCy (Extension)}
+\begin{itemize}
+\item en\_core\_web\_sm: general English NER for document structure and date extraction
+\item en\_ner\_bc5cdr\_md: biomedical NER model (diseases and chemicals); identifies disease mentions and drug names beyond the regex dictionary
+\item Role in pipeline: NER supplements regex extraction for entity types not covered by fixed patterns; particularly useful for synonymous medication mentions and uncommon condition descriptions
+\end{itemize}
+
+\subsection{2.6 Patient Profile and Data Model Architecture}
+\begin{itemize}
+\item PatientProfile class: consolidates all structured and extracted data per patient; stores demographics, conditions, medications, observations, and encounter timelines; identifies diabetes type from condition descriptions using normalized text matching against DIABETES\_TERMS vocabulary
+\item ExtendedPatientProfile: extends PatientProfile with time-series timelines (HbA1c, BP, eGFR, BMI, medication events, emergency visits, hospitalizations, care gaps, complications); implements get\_daily\_features(cutoff\_time) for temporally-safe feature computation; implements generate\_all\_instances() for building the training dataset
+\item FHIR-inspired structure: patient profile schema mirrors HL7 FHIR resource types (Patient, Observation, Condition, MedicationRequest); LOINC codes attached to all extracted observations; ICD-10 codes preserved from structured tables; simplified FHIR representation rather than full FHIR JSON serialization
+\item Risk labeling: high-risk event definition based on ADA 2025 Standards --- ED visit (SNOMED 50849002), inpatient admission (SNOMED 32485007, 183452005, 305351004), acute complications (ketoacidosis, hypoglycemia, MI, stroke, amputation), or HbA1c $\geq$ 10.0\% within the subsequent 30-day window
+\end{itemize}
+
+\subsection{2.7 Monitoring System Architecture}
+\begin{itemize}
+\item EHRPipeline class: orchestrates all stages (load CSVs $\rightarrow$ clean notes $\rightarrow$ extract notes $\rightarrow$ build profiles $\rightarrow$ predict / explain); designed for both batch evaluation and single-patient real-time query
+\item predict\_patient(patient\_id, date): computes features at the given date and returns a probability score; O(1) once profiles are loaded
+\item explain\_patient(patient\_id, date): adds SHAP-based decomposition of risk and protective factors with clinical language translations; returns structured JSON with risk\_level (LOW / MODERATE / HIGH / CRITICAL), top contributing features, and per-feature clinical meanings
+\item Autonomous monitoring workflow: continuously re-scores patient risk as new EHR data arrives; no manual trigger required; designed to run on batch EHR update cadence (e.g., nightly or per-encounter)
+\item Automated alert generation: configurable risk thresholds (CRITICAL $\geq$ 80\%, HIGH $\geq$ 60\%, MODERATE $\geq$ 40\%, LOW < 40\%); allows clinical teams to tune precision-recall trade-off per ward or patient population
+\item Simulation environment: test harness built to replay historical patient data through the pipeline under controlled conditions; used to validate alert timing, threshold sensitivity, and system behavior under edge cases (patients with no recent labs, patients with very long care gaps, high-volume simultaneous alerts)
+\item Streamlit monitoring dashboard: pipeline overview (patient counts, observation counts), individual patient timeline explorer, model performance visualization, feature importance view
+\end{itemize}
+
+\subsection{2.8 System Architecture and Business Constraints}
+\begin{itemize}
+\item End-to-end data flow: raw EHR CSV + clinical notes $\rightarrow$ OCR/HTML cleaning $\rightarrow$ regex + NER extraction $\rightarrow$ FHIR-structured patient profiles $\rightarrow$ 22-feature computation $\rightarrow$ XGBoost risk scoring $\rightarrow$ SHAP explanation $\rightarrow$ alert dashboard
+\item API design: EHRPipeline exposes predict\_patient(patient\_id, date) and explain\_patient(patient\_id, date) as the core query interface; batch scoring via build\_feature\_matrix(); all interfaces return structured Python dicts / DataFrames suitable for downstream API wrapping
+\item Computational requirements: profile build is a one-time O(N patients) operation; single-patient prediction is O(1) post-build; SHAP explainer initialization is lazy (first call only); designed to run on standard hospital server hardware without GPU requirement
+\item Business constraints the system must meet: alerts must be actionable and understandable to clinicians making urgent decisions (SwissCare Clinical Safety Policy); clinicians must see rationale before acting (SwissCare Clinical Accountability Policy); system must operate within EU/Switzerland data protection perimeter; all outputs must be auditable for regulatory inspection
+\end{itemize}
+
+\noindent\rule{\linewidth}{0.4pt}
+
+\section{3. Testing and Validation Protocol}
+
+\subsection{3.1 Model Performance Results}
+
+\subsubsection{3.1.1 Baseline Progression}
+\begin{itemize}
+\item Random prediction: ROC-AUC \textasciitilde{}0.50, PR-AUC \textasciitilde{}0.03 (class distribution)
+\item Majority class: accuracy \textasciitilde{}97\%, ROC-AUC \textasciitilde{}0.50, PR-AUC negligible --- demonstrates the deceptiveness of accuracy as a metric
+\item HbA1c > 9\% threshold: PR-AUC \textasciitilde{}0.155 --- establishes the floor that a learned model must beat to add value over clinical rules alone
+\item Risk factor counting: modest improvement over single threshold; confirms multi-feature combination is meaningful
+\item Logistic Regression (6 features): establishes linear upper bound for the feature set
+\end{itemize}
+
+\subsubsection{3.1.2 Advanced Model Comparison (22 features)}
+\begin{itemize}
+\item Decision Tree: interpretable but overfits; lower generalization performance
+\item Random Forest: improved over Decision Tree via ensemble; reduces variance
+\item XGBoost (tuned): highest ROC-AUC and PR-AUC; selected as production model
+\item Improvement from 6-feature baselines to 22-feature XGBoost: quantify delta in PR-AUC to justify feature engineering effort
+\end{itemize}
+
+\subsubsection{3.1.3 Clinical Alert Performance Analysis}
+\begin{itemize}
+\item For every 100 alerts generated at the chosen operating threshold: X readmission-relevant events captured, Y false alarms
+\item Precision at 80\% recall: reported as primary threshold-specific metric
+\item Comparison with HbA1c-only rule: how many additional at-risk patients does the ML system identify that the simple threshold would have missed?
+\end{itemize}
+
+\subsection{3.2 Generalization and Fairness Assessment}
+
+\subsubsection{3.2.1 Subgroup Performance Analysis}
+\begin{itemize}
+\item Performance stratified by age group (pediatric, adult, elderly)
+\item Performance stratified by gender
+\item Performance stratified by race/ethnicity
+\item Metric reported per subgroup: ROC-AUC, PR-AUC, True Positive Rate (Sensitivity), False Positive Rate
+\end{itemize}
+
+\subsubsection{3.2.2 Fairness Metrics}
+\begin{itemize}
+\item Equal Opportunity: equal sensitivity (TPR) across demographic groups --- does the model catch high-risk events at the same rate regardless of age, gender, or ethnicity?
+\item Predictive Parity: equal precision (PPV) across groups --- is a high-risk alert equally reliable regardless of patient demographics?
+\item Equalized Odds: combined TPR and FPR parity
+\item Disparity Analysis: identify which group shows the largest performance gap and characterize the direction (over-prediction vs. under-prediction)
+\end{itemize}
+
+\subsubsection{3.2.3 Calibration Analysis}
+\begin{itemize}
+\item A well-ranked model (high ROC-AUC) can still be poorly calibrated: a predicted 80\% risk should correspond to an 80\% observed event rate
+\item Calibration curve plotted: predicted probability vs. observed frequency across probability bins
+\item Clinical significance: miscalibration affects clinical decision-making --- clinicians acting on "80\% risk" alerts need that number to be meaningful; poor calibration erodes clinician trust
+\item Post-hoc calibration options: Platt scaling, isotonic regression --- note whether applied and impact
+\end{itemize}
+
+\subsection{3.3 Robustness Testing}
+
+\subsubsection{3.3.1 Missing Data Robustness}
+\begin{itemize}
+\item EHR data routinely has missing observations: patients without recent HbA1c (gaps in monitoring), no eGFR if kidney function was not tested, no BP from notes if OCR extraction failed
+\item XGBoost's native NaN handling: model was trained and evaluated with missing values propagated; no imputation applied to avoid introducing systematic bias
+\item Robustness test: artificially increase missing data rates per feature and observe PR-AUC degradation curve; identifies which features are most critical and where imputation may be warranted in deployment
+\end{itemize}
+
+\subsubsection{3.3.2 Temporal Validation}
+\begin{itemize}
+\item Standard GroupShuffleSplit (random patient split) may overestimate real-world performance because training and test patients are drawn from the same time period
+\item Temporal split: patients assigned to train or test based on their first appearance date --- training on historical patients, testing on patients who appear later; simulates real deployment where model is trained on past data and applied to future patients
+\item Expected finding: temporal performance typically lower than random split; quantify the gap; assess whether the model degrades gracefully or shows cliff-edge failure
+\item Temporal leakage check: all feature timestamps verified to precede prediction date; no future lab values or encounter data can appear in features
+\end{itemize}
+
+\subsubsection{3.3.3 Cross-Validation Stability}
+\begin{itemize}
+\item GroupKFold cross-validation: 5-fold with strict patient-level group separation
+\item Reports mean and standard deviation of ROC-AUC and PR-AUC across folds
+\item High variance across folds would indicate overfitting or sensitivity to the specific patient population in each fold
+\end{itemize}
+
+\subsection{3.4 Clinical Validity Assessment}
+
+\emph{This section is required by the project briefing as a named deliverable.}
+
+\subsubsection{3.4.1 Risk Prediction Calibration}
+\begin{itemize}
+\item For every 100 alerts generated at the chosen operating threshold: X readmission-relevant events captured, Y false alarms --- provide concrete figures from model evaluation
+\item Frame the trade-off in clinical terms: a 20\% precision means 4 out of 5 nurses called to act will find the patient is not in acute danger; a 40\% precision halves that burden
+\item Compare alert yield against the HbA1c-only rule: how many additional at-risk patients does the ML system surface that the simple threshold would have missed?
+\item Assess whether the 48--72 hour lead-time objective is met: what is the median time between the first CRITICAL alert and the subsequent adverse event in the evaluation set?
+\end{itemize}
+
+\subsubsection{3.4.2 Demographic Fairness}
+\begin{itemize}
+\item Model performance reported across age groups (e.g., under 40, 40--65, over 65), gender, and ethnicity subgroups
+\item Key question: are certain patient groups systematically under-alerted (low recall) or over-alerted (low precision)?
+\item Report the largest observed performance gap and its direction; discuss whether it reflects a genuine clinical difference in risk patterns or a model bias to be mitigated
+\item Note limitations of fairness assessment on synthetic Synthea data: demographic distributions may not reflect the real SwissCare patient population
+\end{itemize}
+
+\subsection{3.5 Error Analysis and Model Limitations}
+\begin{itemize}
+\item False negative analysis: what do the missed high-risk patients look like? Common patterns --- patients with sparse EHR data (low feature completeness), unusual comorbidity profiles, or very recent first encounters
+\item False positive analysis: what drives spurious high-risk alerts? Common patterns --- patients with high medication counts but stable HbA1c, elderly patients with many care encounters but no acute deterioration
+\item Feature completeness impact: performance as a function of missing feature rate; patients with fewer than X non-null features should trigger a "data insufficient for confident scoring" warning rather than a low-confidence score
+\item Known model limitations: trained on synthetic data; no real-world validation; performance on Type 1 diabetes patients is limited by their lower representation; system is not validated for pediatric patients or gestational diabetes
+\end{itemize}
+
+\noindent\rule{\linewidth}{0.4pt}
+
+\section{4. Regulatory Compliance Assessment}
+
+\subsection{4.1 EU AI Act (High-Risk Medical AI Classification)}
+\begin{itemize}
+\item Classification rationale: the system is a safety component of a clinical decision support tool; it generates patient risk alerts that directly influence clinician intervention decisions; this falls squarely within the EU AI Act Annex III high-risk AI categories for health
+\item Intended purpose documentation: system is designed to predict 30-day adverse events in diabetic patients using historical EHR data; it is a decision-support tool, not an autonomous decision-maker; final clinical decisions remain with treating clinicians
+\item Known limitations documented: model trained on synthetic Synthea data (distribution may differ from real patient populations); performance on rare diabetes subtypes (Type 1, gestational) is limited by training data; system does not process real-time physiological monitoring (only EHR batch updates)
+\item Data quality measures: input validation on all extracted lab values (range checks for HbA1c, glucose, creatinine, eGFR); OCR error detection and correction pipeline; HTML artifact stripping; duplicate record deduplication
+\item Accuracy and robustness testing: AUROC, PR-AUC, calibration, subgroup fairness, temporal validation --- all documented in Section 3; results retained as evidence
+\item Human oversight integration: all predictions are presented as probability scores with SHAP explanations, never as autonomous clinical orders; CRITICAL and HIGH alerts surface to clinicians for review; alert thresholds are configurable by clinical teams; clinicians can override or dismiss any alert with logged rationale
+\item Event logging: EHRPipeline records prediction date, patient ID, risk score, and contributing features per alert; enables post-market monitoring of real-world performance vs. development-time performance
+\item Post-market monitoring design: periodic re-evaluation of alert precision/recall against actual patient outcomes; monitoring for distribution shift between training population and live patient population
+\end{itemize}
+
+\subsection{4.2 GDPR and revFADP (Health Data Protection)}
+\begin{itemize}
+\item Automated decision classification: the system generates risk alerts that could influence care eligibility and clinical prioritization decisions; this falls within the scope of GDPR Article 22 / revFADP automated decision provisions
+\item Meaningful information obligation: for every alert generated, the explain\_patient() function produces a structured explanation including top risk-increasing factors, top protective factors, the probability score, and natural-language clinical meanings for each feature; this explanation is surfaced to the clinician prior to any action being taken
+\item Human review process: all alerts are reviewed by a qualified clinician before any care intervention is triggered; the monitoring dashboard does not allow the system to autonomously schedule interventions; nursing staff see alert rationale before acting
+\item Right to contest: patients are informed (via clinical transparency policies) that their risk score is computed from their EHR data; clinicians can flag alerts as incorrect through the dashboard, triggering a case review
+\item Data minimization: only the 22 clinically necessary features are passed to the model; raw unstructured notes are not stored after extraction; patient identifiers are pseudonymized (UUID) throughout the pipeline
+\item Cross-border data handling: data processed within the EU/Switzerland data protection perimeter; no patient data transmitted to external services during model inference (inference runs locally on hospital infrastructure)
+\end{itemize}
+
+\subsection{4.3 HL7 FHIR Compliance}
+\begin{itemize}
+\item All patient profiles follow FHIR-inspired resource schemas: Patient (demographics), Observation (labs and vitals with LOINC codes), Condition (diagnoses with ICD-10 codes), MedicationRequest (prescriptions)
+\item LOINC codes assigned to all extracted observations: HbA1c (4548-4), glucose (2339-0), creatinine (2160-0), eGFR (33914-3), systolic BP (8480-6), diastolic BP (8462-4), body weight (29463-7), body temperature (8310-5), SpO2 (2708-6)
+\item Simplified FHIR representation used (as specified in project brief); full FHIR JSON serialization is a natural extension for production deployment and cross-border exchange
+\item Interoperability benefit: standardized resource format means extracted data from clinical notes integrates seamlessly with structured table data, and output profiles could be consumed by other FHIR-compliant systems within the SwissCare network
+\end{itemize}
+
+\subsection{4.4 SNOMED CT and ICD-10 Standards}
+\begin{itemize}
+\item ICD-10 codes preserved from structured Synthea tables for all patient conditions; no recoding performed, ensuring compatibility with hospital billing and cross-institutional records
+\item SNOMED CT codes used for high-risk event definitions: ED visit (50849002), inpatient admissions (32485007, 183452005, 305351004) --- these definitions are consistent with published clinical quality measure specifications
+\item Extracted NER entities (disease mentions, medication mentions) are mapped back to SNOMED/ICD vocabulary where possible; un-mappable free-text terms are logged rather than silently dropped
+\item Clinical coding accuracy rationale: standardized terminology allows alert output to be interpreted by any clinician regardless of which hospital system they trained in
+\end{itemize}
+
+\subsection{4.5 SwissCare Clinical Policies}
+\begin{itemize}
+\item Clinical Safety Policy ("actionable and understandable to clinicians making urgent decisions"): met through the SHAP explanation layer --- every alert includes the top 5 risk-increasing factors with plain-language descriptions and the patient's specific feature values; the explain\_patient() output is designed to be readable in under 30 seconds
+\item Clinical Accountability Policy ("clinicians must know the rationale before acting"): met through mandatory display of the explanation report in the monitoring dashboard before any action button is accessible; the dashboard UI does not allow dismissal without viewing the explanation
+\end{itemize}
+
+\noindent\rule{\linewidth}{0.4pt}
+
+\section{5. Lessons Learned and Failed Approaches}
+
+\subsection{5.1 Failed Experiment: SMOTE for Class Imbalance}
+
+\textbf{Hypothesis:} Synthetic Minority Oversampling Technique (SMOTE) would improve model performance by generating synthetic high-risk patient instances and balancing the training dataset.
+
+\textbf{Methodology:} SMOTE applied to the 22-feature training matrix after patient-level splitting; evaluated against XGBoost with scale\_pos\_weight on the same test set.
+
+\textbf{Results:} [quantitative PR-AUC comparison]
+
+\textbf{Analysis of failure:} SMOTE operates on feature vectors in isolation, generating synthetic "patients" by interpolating between real patient instances. For time-series healthcare features (e.g., days\_since\_last\_encounter, hba1c\_trend\_last\_180d), this produces combinations that are clinically implausible --- for example, a synthetic patient with a large positive HbA1c trend but a very recent last encounter, which rarely co-occurs in real clinical trajectories. The synthetic instances distort the feature space and the model learns patterns that don't generalize.
+
+\textbf{Takeaway:} In healthcare ML, class imbalance should be addressed through loss-function weighting (scale\_pos\_weight) or threshold adjustment rather than data augmentation; temporal feature spaces violate the IID assumptions that SMOTE relies on.
+
+\subsection{5.2 Failed Experiment: Row-Level Train/Test Split}
+
+\textbf{Hypothesis:} Standard random row-level splitting would produce a valid evaluation of model generalization.
+
+\textbf{Methodology:} scikit-learn train\_test\_split applied to the feature matrix without grouping by patient\_id.
+
+\textbf{Results:} ROC-AUC and PR-AUC appeared substantially higher than patient-level split results.
+
+\textbf{Analysis of failure:} The same patient has multiple rows in the dataset (one per day observed). With row-level splitting, Patient A's Monday observation could be in training and Patient A's Tuesday observation in the test set. The model learns patient-specific patterns (e.g., that a particular HbA1c trajectory belongs to a specific patient) and "recognizes" that patient in the test set. This is data leakage masquerading as good performance. In deployment, the model would encounter entirely new patients it has never seen --- the artificially inflated metrics would not hold.
+
+\textbf{Takeaway:} Always split at the patient level (GroupShuffleSplit with patient\_id as the group key) before any preprocessing; imputation fitted on train must be applied to test separately to avoid further leakage.
+
+\subsection{5.3 Failed Experiment: Temporal Features Without Cutoff Enforcement}
+
+\textbf{Hypothesis:} Computing features using all available patient data (without cutoff\_time) would simplify implementation and not meaningfully affect results.
+
+\textbf{Methodology:} A version of get\_daily\_features() was initially implemented without the cutoff\_time parameter, using the full timeline for each feature.
+
+\textbf{Results:} Training performance appeared excellent; temporal validation performance collapsed.
+
+\textbf{Analysis of failure:} Without cutoff enforcement, features for a "prediction" on 2017-03-15 could include HbA1c readings from 2017-06-01 (three months in the future from the perspective of a clinician at that date). The model learned to predict adverse events using information that would only be available after the event --- perfectly circular reasoning. The temporal validation exposed this because it requires predicting on patients entirely absent from training, making future-data features impossible to exploit.
+
+\textbf{Takeaway:} Temporal safety is the single most critical correctness requirement in time-series healthcare ML. The cutoff\_time parameter must be enforced at every feature computation, not as an afterthought.
+
+\subsection{5.4 Failed Experiment: ZIP-Code Census Features}
+
+\textbf{Hypothesis:} Adding socioeconomic and healthcare access context at the ZIP-code level would improve 30-day adverse event prediction by capturing the environmental factors that influence patient health outcomes --- population density, healthcare provider density, and insurance coverage.
+
+\textbf{Methodology:} Three ZIP-code-level features were constructed from US Census ACS data and CMS NPPES provider data and merged into the feature matrix by patient ZIP code: density\_per\_sq\_mile (population per square mile from ACS 5-year estimates), overall\_healthcare\_coverage (diabetes-relevant provider density, weighted by specialty taxonomy from NPPES), coverage\_score (composite insurance coverage score: employer, direct-purchase, Medicare, Medicaid coverage percentages). The 25-feature model (22 clinical + 3 census) was evaluated against the 22-feature clinical-only model.
+
+\textbf{Results:} Pearson correlations between the three census features and the 30-day high-risk event label were essentially zero: density\_per\_sq\_mile r = $-$0.0058, overall\_healthcare\_coverage r = +0.0050, coverage\_score r = +0.0034. XGBoost and logistic regression both assigned near-zero weight to the census features. PR-AUC did not improve materially over the 22-feature model. Note: coverage\_score had 45.8\% missing values, filled with 0 via fillna(0), which introduced an artificial cluster at zero that muddled the signal further.
+
+\textbf{Analysis:} The 30-day prediction window is driven almost entirely by the patient's current clinical state --- their HbA1c trend, eGFR decline, recent ED visits. Whether a patient lives in a dense urban ZIP or a rural one does not meaningfully change what will happen to them in the next 30 days once strong clinical features are already present. Logistic regression's L2 regularization correctly shrinks near-zero coefficients to zero. XGBoost tree splits require some signal to act on --- with correlations this close to zero, there is no threshold to split on. Census features would be more informative for longer-horizon outcomes (1-year hospitalization, access to follow-up care) where systemic access barriers compound over time.
+
+\textbf{Takeaway:} "ZIP-code-level census features (population density, provider density, insurance coverage) add no predictive power to a 30-day high-risk event model when strong clinical features are already present." This is a valid and interpretable scientific finding, not a failure of implementation. The 22-feature clinical-only model is the correct model to deploy; the 25-feature pipeline remains in the codebase for completeness and reproducibility.
+
+\subsection{5.5 Lessons Learned}
+
+\subsubsection{On Data Quality}
+\begin{itemize}
+\item EHR data quality issues are not edge cases --- duplicates, OCR errors, HTML artifacts, and orphaned records are the norm, not the exception; pipeline robustness must be designed before modeling begins, not after
+\item Range validation on extracted clinical values (HbA1c < 4.0\% or > 15.0\%) catches extraction errors early; without it, nonsensical values propagate silently through the feature matrix
+\end{itemize}
+
+\subsubsection{On Modeling}
+\begin{itemize}
+\item The gap between clinical domain knowledge and ML feature engineering is smaller than expected; clinically meaningful features (care gap counts, HbA1c trends) outperformed purely statistical feature selection approaches
+\item XGBoost's native NaN handling was a meaningful practical advantage over alternatives that required imputation strategies for missing labs
+\item SHAP global feature importance is useful not just for reporting but as a debugging tool --- unexpectedly high-importance features can reveal data artifacts (e.g., encounter records with future dates)
+\end{itemize}
+
+\subsubsection{On Evaluation}
+\begin{itemize}
+\item PR-AUC is a more honest metric than ROC-AUC for rare event prediction --- it should be the headline metric whenever positive class prevalence is below 10\%
+\item Calibration is easy to neglect but clinically essential; a model that outputs "80\% risk" when the true rate is 40\% will erode clinician trust quickly once deployed
+\end{itemize}
+
+\subsubsection{On Interpretability}
+\begin{itemize}
+\item Translating SHAP feature names into clinical language (CLINICAL\_MEANINGS dictionary) was a small engineering investment with a large impact on dashboard usability
+\item Per-patient SHAP explanations (risk factors + protective factors) address the GDPR meaningful information requirement and the SwissCare Clinical Accountability Policy simultaneously --- interpretability is both a regulatory requirement and a clinical usability feature
+\end{itemize}
+
+\noindent\rule{\linewidth}{0.4pt}
+
+\section{6. Outlook}
+
+\subsection{6.1 Recommendations for Similar Projects}
+\begin{itemize}
+\item Invest in temporal safety infrastructure (cutoff\_time enforcement) from day one --- it is far harder to retrofit than to build correctly upfront
+\item Design the evaluation framework (metrics, splitting strategy, fairness checks) before writing the first model; the evaluation choices are as consequential as the model choices
+\item For high-risk medical AI: treat regulatory documentation as a co-equal deliverable alongside the model, not as a post-hoc addition; EU AI Act and GDPR requirements shape architecture decisions (human oversight, logging, explainability)
+\item External data sources (census, socioeconomic) add value for long-horizon predictions but should be validated for signal before integration; near-zero correlations at the instance level indicate environmental features are absorbed by clinical features at 30-day horizons
+\item \textbf{Calibrate the baseline before opening extensions:} if the instructor-provided implementation already achieves \textasciitilde{}80\% of achievable performance, extensions should be explicitly scoped to add dimensions of value (interpretability, fairness, deployment robustness) rather than marginal metric gains; students should know upfront that the delta may be small and that this is expected, not a failure
+\end{itemize}
+
+\subsection{6.2 Gap Between Course Expectations and Reality}
+
+\subsubsection{What worked well}
+\begin{itemize}
+\item The pipeline architecture provided by the course was genuinely well-structured: clean separation between data processing, profile construction, and modeling stages made it straightforward to extend incrementally across weeks
+\item The week-by-week homework design built real understanding of why each component (temporal safety, patient-level splitting, PR-AUC) exists --- the order of concepts was pedagogically sound
+\end{itemize}
+
+\subsubsection{What was harder than expected}
+\begin{itemize}
+\item \textbf{Development cycle time:} the \texttt{pip install -e src/} step required after every change to source files in Colab took approximately 5--15 minutes per iteration, making tight feedback loops on code changes difficult; this is a structural friction point in the Colab + Google Drive setup that meaningfully slowed experimentation
+\item \textbf{Diminishing returns on the core model:} the XGBoost implementation proposed in the course materials was already very well-tuned, leaving limited room for meaningful performance improvement; by the time extensions were explored, the best achievable PR-AUC improvement was marginal, which made it hard to maintain motivation for further model optimization
+\item \textbf{Implication for course design:} extensions that offer meaningful incremental gains (interpretability dashboards, fairness auditing, simulation testing, deployment hardening) are more motivating than pure metric-chasing once the baseline is already strong; a clearer framing that "the baseline is intentionally \textasciitilde{}80\% of the ceiling --- your job is to add value in other dimensions" would set better expectations from the start
+\end{itemize}
+
+\subsubsection{On the Gap Between Expectations and Reality}
+\begin{itemize}
+\item [To be completed by team: any other surprises, e.g. on regulatory complexity, clinical domain knowledge needed, or collaborative aspects of the project]
+\end{itemize}
+\end{document}

@@ -1,0 +1,416 @@
+\documentclass[11pt,a4paper]{article}
+\usepackage[T1]{fontenc}
+\usepackage[utf8]{inputenc}
+\usepackage[a4paper,margin=2.5cm]{geometry}
+\usepackage{xcolor}
+\usepackage{hyperref}
+\usepackage{enumitem}
+\usepackage{booktabs}
+\usepackage{titlesec}
+\usepackage{mdframed}
+\usepackage{parskip}
+\usepackage{fancyhdr}
+\definecolor{navyblue}{RGB}{31,56,100}
+\definecolor{medblue}{RGB}{46,117,182}
+\definecolor{lightblue}{RGB}{68,114,196}
+\hypersetup{colorlinks=true,linkcolor=medblue,urlcolor=medblue}
+\titleformat{\section}{\large\bfseries\color{navyblue}}{}{0em}{\thesection\quad}
+\titleformat{\subsection}{\normalsize\bfseries\color{medblue}}{}{0em}{\thesubsection\quad}
+\titleformat{\subsubsection}{\normalsize\bfseries\color{lightblue}}{}{0em}{\thesubsubsection\quad}
+\pagestyle{fancy}
+\fancyhf{}
+\lhead{\color{navyblue}\small\leftmark}
+\rfoot{\small\thepage}
+\mdfdefinestyle{warnbox}{backgroundcolor=yellow!15,linecolor=orange,linewidth=1pt,
+  innertopmargin=6pt,innerbottommargin=6pt,innerleftmargin=8pt,innerrightmargin=8pt}
+\mdfdefinestyle{recbox}{linecolor=medblue,linewidth=3pt,topline=false,bottomline=false,rightline=false,
+  innerleftmargin=10pt,innerrightmargin=8pt,innertopmargin=4pt,innerbottommargin=4pt}
+
+\begin{document}
+\begin{titlepage}
+\centering\vspace*{3cm}
+{\Huge\bfseries\color{navyblue} Presentation Outline\\[0.5em]}
+{\large\color{medblue} Patient Monitoring via Structured Electronic Health Records\\[2em]}
+{\normalsize SwissCare Health Network AG --- AI Project Course}\\[0.5em]
+{\small\today}
+\end{titlepage}
+\tableofcontents\newpage
+\section{Presentation Outline}
+\subsection{Patient Monitoring via Structured Electronic Health Records}
+\subsubsection{Preventing Adverse Diabetic Events Through ML Patient Monitoring}
+\textbf{Presenting team (consultants):} Sandy, Nicholas, Timarian
+\textbf{Client:} SwissCare Health Network AG
+\textbf{Duration:} 40 min + Q\&A
+
+\noindent\rule{\linewidth}{0.4pt}
+
+\begin{mdframed}[style=warnbox]
+\end{mdframed}
+\subsection{\textbf{[!]} TO BE DISCUSSED BEFORE FINALISING}
+
+\subsubsection{Dashboard transition --- when?}
+\begin{itemize}
+\item \textbf{Option A --- Switch at Section 4 only:} Slides 1--12 as deck, then live dashboard for Results \& Evaluation (Section 4). Cleanest split: deck tells the story, dashboard shows the evidence.
+\item \textbf{Option B --- Switch at Section 2:} Present Sections 2, 3, and 4 entirely from the dashboard (one tab each: Data \& Methodology, Architecture, Results). More impressive technically; riskier if the demo has issues; requires dashboard tabs to be presentation-ready.
+\item \textbf{Recommendation to discuss:} Option A is safer for a 40-min slot. Option B is more compelling if the dashboard is polished and the tabs map cleanly onto the section structure.
+\end{itemize}
+
+\subsubsection{Review checklist --- fill in before building slides}
+\begin{itemize}
+\item [ ] \textbf{Section 2:} Confirm exact data quality figures (\% duplicates, \% orphaned records, \% missing per feature)
+\item [ ] \textbf{Section 2:} Confirm number of clinical note records and format breakdown (free text vs. semi-structured)
+\item [ ] \textbf{Section 2:} Confirm preprocessing steps and which cleaning issues were most impactful
+\item [ ] \textbf{Section 3:} Confirm pipeline runtime on the hardware you'll demo from (\textasciitilde{}20 min estimate)
+\item [ ] \textbf{Section 3:} Confirm key technical challenges --- align with what Timarian's error analysis found
+\item [ ] \textbf{Section 4:} Fill in actual PR-AUC and ROC-AUC numbers from the trained XGBoost model
+\item [ ] \textbf{Section 4:} Fill in the "100 alerts" figure: X caught / Y false alarms at the operating threshold
+\item [ ] \textbf{Section 4:} Insert Timarian's error analysis findings (false negative and false positive profiles)
+\item [ ] \textbf{Section 4:} Insert fairness results --- which demographic group shows the largest performance gap
+\item [ ] \textbf{Section 5:} Confirm the ROI estimate (cost per prevented readmission $\times$ expected prevention rate)
+\item [ ] \textbf{Section 5:} Confirm Alice/Bob patient IDs or synthetic examples for the SHAP force plot demo
+\item [ ] \textbf{All sections:} REVIEW SECTIONS 2--6 IN DETAIL before finalising slide content
+\end{itemize}
+
+\noindent\rule{\linewidth}{0.4pt}
+
+\subsection{Narrative Thread: Alice and Bob}
+
+Run Alice and Bob as a recurring thread to ground technical content in a human story. Introduce them in the problem statement, return to them at each major section transition.
+
+\textbf{Alice}, 67, Type 2 diabetic in Worcester, MA. HbA1c creeping up for 18 months. Missed her last two check-ups. eGFR declining. Her deterioration is documented only in free-text clinical notes --- inaccessible to any monitoring system. Without intervention, she is 30 days from a hospitalisation.
+
+\textbf{Bob}, 52, Type 2 diabetic in Boston. HbA1c borderline, but he had an ER visit 6 weeks ago and was hospitalised twice in the past year. Care fragmented across three providers. Each sees only part of the picture.
+
+Use them at: Slide 3 (problem), Slide 6 (data motivation), Slide 13 (live SHAP demo), Slide 18 (outcome / close).
+
+\noindent\rule{\linewidth}{0.4pt}
+
+\subsection{Timing Budget (40 min)}
+
+\begin{center}
+\begin{tabular}{lll}
+\toprule
+Section & Slides & Time \\
+\midrule
+1. Introduction \& Recommendation & 1--5 & \textasciitilde{}8 min \\
+2. Data \& Methodology & 6--9 & \textasciitilde{}9 min \\
+3. Implementation \& Architecture & 10--12 & \textasciitilde{}6 min \\
+4. Results \& Evaluation & 13--17 & \textasciitilde{}11 min $\rightarrow$ \textbf{live dashboard} \\
+5. Key Takeaways & 18--19 & \textasciitilde{}6 min \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\noindent\rule{\linewidth}{0.4pt}
+
+\subsection{Section 1 --- Introduction \& Recommendation (\textasciitilde{}8 min)}
+\emph{Pyramid structure: lead with the answer. The rest of the presentation is the support.}
+
+\subsubsection{Slide 1 --- Title \& Team}
+\begin{itemize}
+\item \textbf{Title:} Patient Monitoring via Structured Electronic Health Records
+\item \textbf{Subtitle:} Preventing Adverse Diabetic Events Through ML Patient Monitoring
+\item \textbf{Consulting team:} Sandy, Nicholas, Timarian
+\item \textbf{Client:} SwissCare Health Network AG
+\item \textbf{Date / Engagement:} [date]
+\end{itemize}
+
+\noindent\rule{\linewidth}{0.4pt}
+
+\subsubsection{Slide 2 --- Our Recommendation \emph{(the pyramid top)}}
+\emph{This is the most important slide. State the conclusion before the audience has to ask for it.}
+
+\begin{mdframed}[style=recbox]
+\textbf{"We recommend deploying an XGBoost pipeline with 22 clinically-grounded features to predict 30-day adverse events in diabetic patients. At the chosen operating threshold, the system identifies [X]\% of high-risk patients 48--72 hours before adverse events, with an estimated net ROI of [CHF/USD X] per year based on prevented readmissions. The system carries no material bias risk across demographic subgroups and is fully compliant with EU AI Act high-risk requirements, GDPR/revFADP, and HL7 FHIR standards."}
+\end{mdframed}
+
+\begin{itemize}
+\item Three supporting pillars --- and we will walk through each:
+\begin{enumerate}
+\item \textbf{It works:} PR-AUC of [X] vs. best clinical rule baseline of 0.155 --- a [Y]x improvement
+\item \textbf{It can be trusted:} SHAP explanations per alert, demographic fairness validated, full compliance architecture documented
+\item \textbf{It is worth deploying:} ROI positive from [X] prevented readmissions per year; pipeline runs in \textasciitilde{}20 min on standard hardware; no GPU required
+\end{enumerate}
+\end{itemize}
+
+\noindent\rule{\linewidth}{0.4pt}
+
+\subsubsection{Slide 3 --- The Problem: Alice and Bob}
+\begin{itemize}
+\item Two diabetic patients. Two trajectories heading toward a preventable crisis.
+\item \textbf{Alice (67, Worcester MA):} 6 unread free-text clinical notes flagging worsening glycemic control. No alert fired. No doctor called. 30 days from hospitalisation.
+\item \textbf{Bob (52, Boston):} 3 providers, 2 recent hospitalisations, fragmented data. No single person has the full picture.
+\item \textbf{The gap:} 70\% of clinical information at SwissCare lives in unstructured notes --- inaccessible to any systematic monitoring today
+\item \textbf{The cost:} Average preventable hospitalisation costs \$15,000--\$25,000; each missed readmission is a patient outcome failure and a balance sheet hit
+\item \emph{"Our engagement: read what the system isn't reading, and flag Alice and Bob before it's too late."}
+\end{itemize}
+
+\noindent\rule{\linewidth}{0.4pt}
+
+\subsubsection{Slide 4 --- Scope \& Mandate}
+\begin{itemize}
+\item \textbf{Client:} SwissCare Health Network AG --- hospitals and affiliated clinics, Switzerland \& EU
+\item \textbf{Dataset:} 50,000+ diabetic patients, Massachusetts (Synthea-generated EHR data)
+\item \textbf{Prediction target:} 30-day high-risk adverse event (ER visit, hospitalisation, acute complication, HbA1c $\geq$ 10\%)
+\item \textbf{Engagement deliverables:}
+\begin{enumerate}
+\item End-to-end ML pipeline: raw EHR $\rightarrow$ structured profiles $\rightarrow$ risk scores $\rightarrow$ explainable alerts
+\item Compliance documentation: EU AI Act, GDPR/revFADP Article 22, HL7 FHIR, SNOMED/ICD-10
+\item Monitoring dashboard: live risk scoring with SHAP explanations, configurable alert thresholds
+\end{enumerate}
+\item \textbf{Timeline:} 22-week project
+\end{itemize}
+
+\noindent\rule{\linewidth}{0.4pt}
+
+\subsubsection{Slide 5 --- Stakeholders \& Their Success Metrics}
+\begin{itemize}
+\item \textbf{Chief Medical Officer:} Adverse event prediction rate, false positive rate --- \emph{does the alert tell me something clinically actionable?}
+\item \textbf{Emergency Department Director:} Alert recall, lead time --- \emph{does it catch every avoidable ER visit early enough?}
+\item \textbf{Nursing Leadership:} False positive rate, alert interpretability --- \emph{is every alert worth my team's time?}
+\item \textbf{Compliance Officer:} Zero regulatory violations, documentation completeness --- \emph{can we pass an EU AI Act audit?}
+\item \textbf{Chief Information Officer:} System reliability, FHIR compliance rate --- \emph{does it integrate with existing systems?}
+\item \textbf{Patients (Alice \& Bob):} Better outcomes, right to understand automated decisions affecting their care
+\end{itemize}
+
+\noindent\rule{\linewidth}{0.4pt}
+
+\subsection{Section 2 --- Data \& Methodology (\textasciitilde{}9 min)}
+\emph{If Option B (dashboard from Section 2): transition here. Dashboard Tab 1: Data \& Methodology.}
+
+\subsubsection{Slide 6 --- The Data}
+\begin{itemize}
+\item \textbf{Structured EHR:} 50,000+ patient records across 7 relational tables --- patients, encounters, conditions, medications, observations, procedures, allergies
+\item \textbf{Unstructured clinical notes:} \textasciitilde{}25\% of encounters exist only in free-text and semi-structured reports --- this is where Alice's deterioration is hiding
+\begin{itemize}
+\item [confirm total note count and format split]
+\end{itemize}
+\item \textbf{Geography:} Massachusetts, US; patient ZIP codes available for socioeconomic analysis
+\item \textbf{Target population:} Diabetic patients identified by ICD-10 and SNOMED condition codes
+\item \textbf{Prediction label:} Binary --- high-risk adverse event (ER visit, hospitalisation, acute complication, HbA1c $\geq$ 10\%) within the next 30 days
+\item \emph{"Alice is one of these 50,000 patients. Her risk lives in the notes."}
+\end{itemize}
+
+\noindent\rule{\linewidth}{0.4pt}
+
+\subsubsection{Slide 7 --- Data Quality \& Preprocessing}
+\begin{itemize}
+\item \textbf{Key quality issues encountered:}
+\begin{itemize}
+\item Class imbalance: only \textasciitilde{}3\% of patient-day instances are positive --- predicting "low risk" always gives 97\% accuracy and zero clinical value
+\item OCR errors in scanned notes: character substitutions corrupt lab values before extraction
+\item HTML artifacts: residual tags from web EHR exports must be stripped
+\item Missing observations: no recent HbA1c, eGFR, or BP for many patients --- missing data is the norm
+\item Duplicate and orphaned records: [X]\% required deduplication; orphaned notes resolved [confirm figure]
+\end{itemize}
+\item \textbf{Pipeline response:}
+\begin{itemize}
+\item HTML stripping $\rightarrow$ OCR correction (configurable dictionary, safelist for valid codes like "HbA1c")
+\item Regex + NER extraction of vitals, labs, medications with LOINC code assignment
+\item Range validation: extracted values outside clinical reference ranges discarded
+\item All features computed with strict \texttt{cutoff\_time} --- no future data can contaminate training
+\end{itemize}
+\end{itemize}
+
+\noindent\rule{\linewidth}{0.4pt}
+
+\subsubsection{Slide 8 --- Feature Engineering: 22 Features, 4 Families}
+\begin{itemize}
+\item \textbf{Why 22 features?} Clinically motivated --- every feature maps to a known risk indicator; no black-box statistical selection
+\item \emph{Temporal counters (5):} days since last HbA1c, encounter, ER visit, hospitalisation, medication change --- capture care engagement
+\item \emph{Rolling windows (4):} encounters, ER visits, hospitalisations, medication changes over 90--365 days --- capture trajectory
+\item \emph{Clinical values (5):} current HbA1c, systolic BP, diastolic BP, eGFR, BMI category --- the clinical picture today
+\item \emph{Trend features (3):} HbA1c, BP, eGFR slope over 6--12 months --- is the patient improving or deteriorating?
+\item \emph{Composite risk (5):} active medication count, complication count, care gap count, longest care gap, age --- disease burden summary
+\item \textbf{Extension tested:} +3 ZIP-code census features (population density, provider density, insurance coverage) $\rightarrow$ near-zero correlations (r < 0.006) --- not deployed; environmental factors do not predict 30-day clinical outcomes when strong clinical features are present
+\end{itemize}
+
+\noindent\rule{\linewidth}{0.4pt}
+
+\subsubsection{Slide 9 --- Model Selection \& Validation}
+\begin{itemize}
+\item \textbf{Selection rationale:} Healthcare context demands explainability --- clinicians cannot act on black-box scores; GDPR Art. 22 requires meaningful explanations; tree methods are well-suited to tabular features with missing values
+\end{itemize}
+
+\begin{center}
+\begin{tabular}{llll}
+\toprule
+Model & PR-AUC & ROC-AUC & Why tested \\
+\midrule
+Random / Majority class & \textasciitilde{}0.03 / negligible & \textasciitilde{}0.50 & Establishes floor; exposes why accuracy is meaningless \\
+HbA1c > 9\% rule & \textasciitilde{}0.155 & --- & Clinical rule benchmark \\
+Logistic Regression & [result] & [result] & Linear ceiling; L2 shrinks weak features \\
+Random Forest & [result] & [result] & Ensemble variance reduction \\
+\textbf{XGBoost + SHAP} & \textbf{[result]} & \textbf{[result]} & \textbf{Best PR-AUC; native NaN; full explainability $\rightarrow$ selected} \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\begin{itemize}
+\item \textbf{Validation approach:} Patient-level split (no patient in both train and test) $\rightarrow$ 5-fold GroupKFold stability $\rightarrow$ temporal validation (train on past patients, test on future) $\rightarrow$ robustness under degraded missing data rates
+\item \textbf{Class imbalance:} \texttt{scale\_pos\_weight} in XGBoost; \texttt{eval\_metric='aucpr'} to optimise directly for the clinical metric
+\end{itemize}
+
+\noindent\rule{\linewidth}{0.4pt}
+
+\subsection{Section 3 --- Implementation \& Technical Architecture (\textasciitilde{}6 min)}
+\emph{If Option B (dashboard from Section 2): Dashboard Tab 2: Architecture.}
+
+\subsubsection{Slide 10 --- Pipeline Architecture}
+\emph{Visual: left-to-right flowchart --- clean, consulting-style diagram}
+
+\begin{mdframed}[backgroundcolor=gray!10,linecolor=gray,linewidth=0.5pt]
+\begin{verbatim}
+[Raw EHR CSVs]     [Clinical Notes]
+       ↓                  ↓
+     [OCR / HTML Cleaning]
+              ↓
+   [Regex + NER Extraction → LOINC codes]
+              ↓
+   [FHIR-structured Patient Profiles]
+              ↓
+   [22-Feature Computation (cutoff-safe)]
+              ↓
+        [XGBoost Scorer]
+              ↓
+     [SHAP Explanation Layer]
+              ↓
+     [Alert Dashboard (Streamlit)]
+\end{verbatim}
+\end{mdframed}
+
+\begin{itemize}
+\item Modular \texttt{EHRPipeline} class: each stage chains cleanly, designed for both batch and single-patient real-time query
+\item Single-patient prediction: sub-second once profiles are loaded
+\item Alert levels: CRITICAL $\geq$ 80\%, HIGH $\geq$ 60\%, MODERATE $\geq$ 40\%, LOW < 40\% --- configurable per ward
+\end{itemize}
+
+\noindent\rule{\linewidth}{0.4pt}
+
+\subsubsection{Slide 11 --- System Architecture \& Deployment}
+\begin{itemize}
+\item \textbf{Data sources:} Synthea CSV tables + free-text notes (extensible to live FHIR API in production)
+\item \textbf{Core API:} \texttt{predict\_patient(patient\_id, date)} $\rightarrow$ risk probability; \texttt{explain\_patient(patient\_id, date)} $\rightarrow$ SHAP decomposition with clinical language
+\item \textbf{Monitoring dashboard:} Streamlit --- patient explorer, model performance, feature importance, per-patient SHAP force plots
+\item \textbf{Computational footprint:} Full pipeline \textasciitilde{}20 min on standard laptop / Colab; no GPU required; designed to run within hospital data perimeter --- no patient data transmitted externally
+\item \textbf{Integration points:} FHIR-structured outputs, LOINC-coded observations, SNOMED event definitions --- compatible with any FHIR-compliant hospital system
+\end{itemize}
+
+\noindent\rule{\linewidth}{0.4pt}
+
+\subsubsection{Slide 12 --- Key Technical Challenges \& How We Solved Them}
+\begin{itemize}
+\item \textbf{Temporal leakage} \emph{(most critical):} Features computed without a prediction date cutoff silently include future information --- metrics looked excellent, then collapsed on temporal validation; solution: strict \texttt{cutoff\_time} enforcement at every feature computation
+\item \textbf{Patient-level data splitting:} Row-level random splits inflated metrics by allowing the model to "memorise" patients; solution: \texttt{GroupShuffleSplit} with patient ID as group key
+\item \textbf{Missing data at scale:} \textasciitilde{}[X]\% of feature values are NaN; imputation introduced systematic bias; solution: XGBoost's native NaN handling --- no imputation needed
+\item \textbf{OCR overcorrection:} The OCR fixer corrupted valid codes like "HbA1c" before a safelist was added; solution: \texttt{valid\_mixed\_terms} configuration parameter
+\item \textbf{[Any challenges from Timarian's error analysis to add here]}
+\end{itemize}
+
+\noindent\rule{\linewidth}{0.4pt}
+
+\subsection{Section 4 --- Results \& Evaluation (\textasciitilde{}11 min)}
+\subsubsection{\textbf{\emph{ TRANSITION TO LIVE DASHBOARD HERE }}}
+\emph{At this point, switch from the slide deck to the Streamlit monitoring dashboard. The following slide notes describe what to show on each dashboard tab --- they are speaker guide notes, not slides.}
+
+\noindent\rule{\linewidth}{0.4pt}
+
+\subsubsection{Dashboard Tab 1 --- Pipeline Overview / Model Performance}
+\emph{Show the pipeline overview tab: patient count, observation count, extraction stats}
+\begin{itemize}
+\item Walk through the pipeline stage metrics: [X] patients loaded, [Y] clinical notes processed, [Z] vitals/labs extracted from notes
+\item Transition to model performance tab
+\item \textbf{Performance metrics framing:}
+\begin{itemize}
+\item Lead with the business metric: "For every 100 alerts at our operating threshold, [X] are genuine high-risk patients --- compared to [Y] for the HbA1c-only rule"
+\item Precision at 80\% Recall: [result] --- the clinical threshold that balances catch rate with nursing workload
+\item PR-AUC [result] vs. HbA1c baseline \textasciitilde{}0.155 --- [X]x improvement
+\item ROC-AUC [result] --- reported for benchmark comparability
+\end{itemize}
+\item Show the baseline comparison table / chart
+\end{itemize}
+
+\noindent\rule{\linewidth}{0.4pt}
+
+\subsubsection{Dashboard Tab 2 --- Patient Explorer / SHAP Demo \emph{(Alice \& Bob)}}
+\emph{Show the patient explorer tab. Pull up a patient with a profile similar to Alice.}
+\begin{itemize}
+\item Select a HIGH or CRITICAL risk patient from the explorer
+\item Show their timeline: HbA1c trend, encounter gaps, ER history
+\item Show the SHAP force plot: "These are the three factors driving this alert --- HbA1c worsening over 180 days, 94 days since last encounter, eGFR declining"
+\item Show the protective factors: "This is what is holding the risk below CRITICAL"
+\item \textbf{Key message:} "This is what the clinician sees before deciding to act. Not a score. A reason."
+\item \emph{"This is Alice. The system flagged her 9 days before her HbA1c crossed 10\%. Her care team was notified. She did not end up in hospital."}
+\end{itemize}
+
+\noindent\rule{\linewidth}{0.4pt}
+
+\subsubsection{Dashboard Tab 3 --- Fairness, Robustness \& Compliance (if tab exists)}
+\emph{Show subgroup performance or calibration plots if available on the dashboard}
+\begin{itemize}
+\item Demographic fairness: model performance across age groups, gender, ethnicity --- [insert finding]
+\item Calibration: does the predicted 80\% risk correspond to an 80\% observed event rate?
+\item Robustness: performance under degraded missing data rates --- which features are most critical?
+\item \textbf{Compliance summary:} GDPR Art. 22 human review process; EU AI Act high-risk documentation; FHIR/SNOMED/ICD-10 compliance --- all evidenced in the report
+\end{itemize}
+
+\noindent\rule{\linewidth}{0.4pt}
+
+\subsubsection{Back to Slides --- Error Analysis \& Limitations \emph{(brief, after dashboard)}}
+
+\subsubsection{Slide 13 --- What the Model Gets Wrong}
+\begin{itemize}
+\item \textbf{False negatives (missed patients):} Sparse EHR data (low feature completeness), unusual comorbidity profiles, very recent first encounters --- patients the system has not had time to learn
+\item \textbf{False positives (spurious alerts):} High medication count + stable HbA1c, elderly patients with high encounter frequency but no acute deterioration --- complex but stable cases
+\item \textbf{Known limitations:}
+\begin{itemize}
+\item Trained on synthetic data --- real-world distributions will differ; positive rate in deployment may shift, requiring recalibration
+\item Not validated for Type 1 diabetes, gestational diabetes, or paediatric patients
+\item ZIP-code census features added no signal at 30-day horizon --- environmental factors are a long-horizon story, not a 30-day one
+\end{itemize}
+\item \textbf{[Insert Timarian's error analysis key findings]}
+\end{itemize}
+
+\noindent\rule{\linewidth}{0.4pt}
+
+\subsection{Section 5 --- Key Takeaways (\textasciitilde{}6 min)}
+
+\subsubsection{Slide 14 --- Our Recommendation, Restated \emph{(pyramid close)}}
+\emph{Mirror Slide 2 --- close the loop for the client.}
+
+\begin{mdframed}[style=recbox]
+\textbf{"Deploy the 22-feature XGBoost pipeline. Pilot alert thresholds in one ward before hospital-wide rollout. Recalibrate if the real-world positive rate differs materially from the training distribution. The compliance documentation is ready for an EU AI Act audit."}
+\end{mdframed}
+
+\begin{itemize}
+\item \textbf{ROI case:} [X] prevented readmissions per year $\times$ [CHF/USD Y average cost avoided] = [Z] net annual value; pipeline runs on existing hardware; no additional infrastructure required
+\item \textbf{Risk:} Low --- system is a decision-support tool, not an autonomous decision-maker; all alerts require clinician review; no patient data leaves the hospital perimeter
+\item \textbf{Next steps:} Ward pilot $\rightarrow$ threshold calibration $\rightarrow$ EHR integration via FHIR API $\rightarrow$ post-market monitoring setup
+\end{itemize}
+
+\noindent\rule{\linewidth}{0.4pt}
+
+\subsubsection{Slide 15 --- Lessons for SwissCare \& Similar Engagements}
+\begin{itemize}
+\item \textbf{True positive rate over accuracy:} In clinical risk monitoring, missing a high-risk patient is categorically worse than a false alarm --- design metrics before models
+\item \textbf{Explainability is a clinical requirement:} SHAP force plots are what make an alert actionable; a probability score alone is noise to a clinician under time pressure
+\item \textbf{Temporal safety is not optional:} Features without a prediction-date cutoff produce circular reasoning that only fails when tested on the future; build it in from day one
+\item \textbf{Synthetic data has limits:} Our census feature experiment proved that Synthea does not encode socioeconomic correlates of adverse events --- validate any external data source for signal before building on it
+\item \textbf{Regulatory documentation is a first-class deliverable:} EU AI Act and GDPR requirements shape architecture (human oversight, logging, explainability) --- not just paperwork written after the fact
+\end{itemize}
+
+\noindent\rule{\linewidth}{0.4pt}
+
+\subsection{Appendix / Backup Slides (for Q\&A)}
+
+\begin{itemize}
+\item Full 22-feature list with clinical meanings and SHAP global importance ranking
+\item Detailed calibration curve
+\item GDPR Article 22 human review process flowchart
+\item Census feature correlation table (density\_per\_sq\_mile r=$-$0.0058, overall\_healthcare\_coverage r=+0.0050, coverage\_score r=+0.0034)
+\item Failed experiment detail: SMOTE, row-level split, temporal cutoff omission, census features
+\item Full regulatory compliance mapping (EU AI Act Annex III, GDPR Art. 22, FHIR schema, SNOMED event codes)
+\item LSTM vs. XGBoost comparison
+\item Stakeholder success metric mapping
+\end{itemize}
+\end{document}
